@@ -2,7 +2,8 @@
 import { GoogleGenAI } from "@google/genai";
 import { SMCZone, MarketBias, JournalEntry, LiquidityLevel } from "../types";
 
-const apiKey = process.env.API_KEY || '';
+// Safely access process.env.API_KEY to prevent ReferenceError in strict browser environments
+const apiKey = (typeof process !== 'undefined' && process.env && process.env.API_KEY) || '';
 const ai = new GoogleGenAI({ apiKey });
 
 const getSessionContext = () => {
@@ -21,7 +22,7 @@ export const generateTradePlan = async (
   liquidityLevels: LiquidityLevel[],
   currentPrice: number
 ): Promise<string> => {
-  if (!apiKey) return "API Anahtarı bulunamadı.";
+  if (!apiKey) return "API Anahtarı bulunamadı (process.env.API_KEY).";
 
   // 1. Context Building
   const session = getSessionContext();
@@ -102,7 +103,7 @@ export const generateTradePlan = async (
     return response.text || "Plan oluşturulamadı.";
   } catch (error) {
     console.error("Gemini API Error:", error);
-    return "API Hatası: Analiz servisine ulaşılamadı.";
+    return "API Hatası: Analiz servisine ulaşılamadı. (API Key Kontrolü Yapın)";
   }
 };
 
