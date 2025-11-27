@@ -1,7 +1,11 @@
+
 import { GoogleGenAI } from "@google/genai";
 import { SMCZone, MarketBias, JournalEntry, LiquidityLevel } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// API Key'i doğrudan tanımlıyoruz (Kullanıcı isteği üzerine entegre edildi)
+const API_KEY = process.env.API_KEY || "AIzaSyAIy1YLvAcfKQBxgwOTffKs-25JYlgtREQ";
+
+const ai = new GoogleGenAI({ apiKey: API_KEY });
 
 const getSessionContext = () => {
     const hour = new Date().getUTCHours();
@@ -19,6 +23,11 @@ export const generateTradePlan = async (
   liquidityLevels: LiquidityLevel[],
   currentPrice: number
 ): Promise<string> => {
+  // Kritik Kontrol
+  if (!API_KEY) {
+    return "⚠️ HATA: API Anahtarı Bulunamadı.";
+  }
+
   // 1. Context Building
   const session = getSessionContext();
   const zoneRange = Math.abs(zone.priceTop - zone.priceBottom).toFixed(5);
@@ -98,11 +107,13 @@ export const generateTradePlan = async (
     return response.text || "Plan oluşturulamadı.";
   } catch (error) {
     console.error("Gemini API Error:", error);
-    return "API Hatası: Analiz servisine ulaşılamadı. (API Key Kontrolü Yapın)";
+    return "API Hatası: Analiz servisine ulaşılamadı. Lütfen internet bağlantınızı kontrol edin.";
   }
 };
 
 export const analyzeJournal = async (trades: JournalEntry[]): Promise<string> => {
+  if (!API_KEY) return "⚠️ HATA: API Anahtarı Bulunamadı.";
+
   const tradeSummary = trades
     .map(t => `- ${t.date}: ${t.trader} ${t.asset} (${t.type}) -> ${t.status}. Not: ${t.note}`)
     .join('\n');
