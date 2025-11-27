@@ -1,9 +1,7 @@
-
 import { GoogleGenAI } from "@google/genai";
 import { SMCZone, MarketBias, JournalEntry, LiquidityLevel } from "../types";
 
-const apiKey = process.env.API_KEY || '';
-const ai = new GoogleGenAI({ apiKey });
+const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
 const getSessionContext = () => {
     const hour = new Date().getUTCHours();
@@ -21,8 +19,6 @@ export const generateTradePlan = async (
   liquidityLevels: LiquidityLevel[],
   currentPrice: number
 ): Promise<string> => {
-  if (!apiKey) return "API Anahtarı bulunamadı (process.env.API_KEY).";
-
   // 1. Context Building
   const session = getSessionContext();
   const zoneRange = Math.abs(zone.priceTop - zone.priceBottom).toFixed(5);
@@ -107,8 +103,6 @@ export const generateTradePlan = async (
 };
 
 export const analyzeJournal = async (trades: JournalEntry[]): Promise<string> => {
-  if (!apiKey) return "API Anahtarı bulunamadı.";
-
   const tradeSummary = trades
     .map(t => `- ${t.date}: ${t.trader} ${t.asset} (${t.type}) -> ${t.status}. Not: ${t.note}`)
     .join('\n');
