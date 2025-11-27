@@ -1,10 +1,8 @@
-declare var process: any;
 
 import { GoogleGenAI } from "@google/genai";
 import { SMCZone, MarketBias, JournalEntry, LiquidityLevel } from "../types";
 
-// Safely access process.env.API_KEY to prevent ReferenceError in strict browser environments
-const apiKey = (typeof process !== 'undefined' && process.env && process.env.API_KEY) || '';
+const apiKey = process.env.API_KEY || '';
 const ai = new GoogleGenAI({ apiKey });
 
 const getSessionContext = () => {
