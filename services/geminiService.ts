@@ -1,3 +1,4 @@
+declare var process: any;
 
 import { GoogleGenAI } from "@google/genai";
 import { SMCZone, MarketBias, JournalEntry, LiquidityLevel } from "../types";
