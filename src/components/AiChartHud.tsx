@@ -1,8 +1,15 @@
-import React, { useState, useEffect } from 'react';
-import { Activity, ScanEye, Microscope, ChevronUp, ChevronDown, CheckCircle2, XCircle, Timer, Zap } from 'lucide-react';
-import { MarketBias } from '../types';
 
-const AiChartHud = ({ bias, activeCount }: { bias: MarketBias | null, activeCount: number }) => {
+import React, { useState, useEffect, useMemo } from 'react';
+import { Activity, ScanEye, Microscope, ChevronUp, ChevronDown, CheckCircle2, XCircle, Timer, Zap, Clock, Brain } from 'lucide-react';
+import { MarketBias, AIResponse } from '../types';
+
+interface AiChartHudProps {
+    bias: MarketBias | null;
+    activeCount: number;
+    aiResponse?: AIResponse | null;
+}
+
+const AiChartHud: React.FC<AiChartHudProps> = ({ bias, activeCount, aiResponse }) => {
     const [isExpanded, setIsExpanded] = useState(true);
     const [timeToNextSession, setTimeToNextSession] = useState('');
     const [currentSessionName, setCurrentSessionName] = useState('');
@@ -134,11 +141,52 @@ const AiChartHud = ({ bias, activeCount }: { bias: MarketBias | null, activeCoun
                             ))}
                         </div>
                         
-                        {/* 4. AI ANALYSIS TEXT */}
+                        {/* 4. TREND STRENGTH & PREMIUM/DISCOUNT METER */}
+                        {bias.trendStrength !== undefined && (
+                            <div className="pt-2 border-t border-slate-800">
+                                <div className="flex items-center justify-between mb-1">
+                                    <span className="text-[9px] text-slate-400">Trend Gücü</span>
+                                    <span className="text-[9px] font-mono font-bold text-cyan-400">{bias.trendStrength.toFixed(0)}%</span>
+                                </div>
+                                <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden">
+                                    <div 
+                                        className="h-full bg-gradient-to-r from-red-500 via-yellow-500 to-green-500 transition-all duration-500"
+                                        style={{ width: `${bias.trendStrength}%` }}
+                                    />
+                                </div>
+                            </div>
+                        )}
+                        
+                        {/* 5. PREMIUM/DISCOUNT INDICATOR */}
+                        <div className="pt-2 border-t border-slate-800">
+                            <div className="flex items-center justify-between">
+                                <span className="text-[9px] text-slate-400">P/D Seviyesi</span>
+                                <span className={`text-[9px] font-bold ${
+                                    bias.premiumDiscount === 'Premium' ? 'text-red-400' : 
+                                    bias.premiumDiscount === 'Discount' ? 'text-green-400' : 
+                                    'text-yellow-400'
+                                }`}>
+                                    {bias.premiumDiscount}
+                                </span>
+                            </div>
+                            <div className="h-1.5 bg-slate-800 rounded-full overflow-hidden mt-1 relative">
+                                <div className="absolute left-0 top-0 bottom-0 w-1/2 bg-gradient-to-r from-green-600/30 to-transparent" />
+                                <div className="absolute right-0 top-0 bottom-0 w-1/2 bg-gradient-to-l from-red-600/30 to-transparent" />
+                                <div 
+                                    className={`absolute top-0 bottom-0 w-1 bg-white shadow-lg transition-all duration-500 ${
+                                        bias.premiumDiscount === 'Premium' ? 'right-0' : 
+                                        bias.premiumDiscount === 'Discount' ? 'left-0' : 
+                                        'left-1/2 transform -translate-x-1/2'
+                                    }`}
+                                />
+                            </div>
+                        </div>
+                        
+                        {/* 6. AI ANALYSIS TEXT */}
                          <div className="pt-2 border-t border-slate-800">
                             <p className="text-[10px] text-slate-300 font-mono leading-relaxed opacity-80">
                                 {bias.isNewsLocked ? "⚠️ HABER KİLİDİ AKTİF. İŞLEM YOK." : 
-                                 `ATR (${bias.atrValue.toFixed(4)}) normal. ${bias.premiumDiscount} bölgesindeyiz. ${bias.structure} yapısı korunuyor.`}
+                                 `ATR (${bias.atrValue.toFixed(4)}) ${bias.volatility === 'HIGH' ? 'yüksek' : bias.volatility === 'LOW' ? 'düşük' : 'normal'}. ${bias.premiumDiscount} bölgesindeyiz. ${bias.structure} yapısı korunuyor.`}
                             </p>
                         </div>
                     </div>
@@ -155,8 +203,45 @@ const AiChartHud = ({ bias, activeCount }: { bias: MarketBias | null, activeCoun
                     %{bias.winRate.toFixed(1)}
                  </span>
             </div>
+
+            {/* AI CONFIDENCE SCORE */}
+            {aiResponse?.confidence && (
+                <div className={`bg-black/90 backdrop-blur border ${
+                    aiResponse.confidence >= 7 ? 'border-green-500/30' : 
+                    aiResponse.confidence >= 5 ? 'border-yellow-500/30' : 
+                    'border-red-500/30'
+                } p-2 rounded-lg flex items-center justify-between shadow-xl w-72 pointer-events-auto`}>
+                    <span className="text-[10px] text-slate-400 font-bold flex items-center gap-2">
+                        <Brain className="w-3 h-3 text-cyan-400"/>
+                        AI GÜVEN SKORU
+                    </span>
+                    <div className="flex items-center gap-2">
+                        <div className="flex items-center gap-1">
+                            {[...Array(10)].map((_, i) => (
+                                <div
+                                    key={i}
+                                    className={`w-1.5 h-3 rounded ${
+                                        i < aiResponse.confidence!
+                                            ? aiResponse.confidence! >= 7 ? 'bg-green-400' : 
+                                              aiResponse.confidence! >= 5 ? 'bg-yellow-400' : 
+                                              'bg-red-400'
+                                            : 'bg-slate-700'
+                                    }`}
+                                />
+                            ))}
+                        </div>
+                        <span className={`text-xs font-mono font-bold ${
+                            aiResponse.confidence >= 7 ? 'text-green-400' : 
+                            aiResponse.confidence >= 5 ? 'text-yellow-400' : 
+                            'text-red-400'
+                        }`}>
+                            {aiResponse.confidence.toFixed(1)}/10
+                        </span>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };
 
-export default AiChartHud;
+export default React.memo(AiChartHud);

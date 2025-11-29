@@ -1,7 +1,14 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { Zap, Ban } from 'lucide-react';
 
-const ExecutionPanel = ({ price, onExecute, isLocked, reason }: { price: number, onExecute: (type: 'BUY' | 'SELL', lot: number, sl: number, tp: number) => void, isLocked: boolean, reason?: string }) => {
+interface ExecutionPanelProps {
+    price: number;
+    onExecute: (type: 'BUY' | 'SELL', lot: number, sl: number, tp: number) => void;
+    isLocked: boolean;
+    reason?: string;
+}
+
+const ExecutionPanel: React.FC<ExecutionPanelProps> = ({ price, onExecute, isLocked, reason }) => {
     const [lot, setLot] = useState(1.0);
     const [sl, setSl] = useState<string>('');
     const [tp, setTp] = useState<string>('');
@@ -54,4 +61,4 @@ const ExecutionPanel = ({ price, onExecute, isLocked, reason }: { price: number,
     )
 }
 
-export default ExecutionPanel;
+export default React.memo(ExecutionPanel);

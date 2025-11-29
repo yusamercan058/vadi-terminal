@@ -1,6 +1,6 @@
 import React, { useEffect, useRef } from 'react';
 
-const TradingViewWidget = ({ symbol }: { symbol: string }) => {
+const TradingViewWidget = ({ symbol, interval }: { symbol: string, interval: string }) => {
   const container = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -13,7 +13,7 @@ const TradingViewWidget = ({ symbol }: { symbol: string }) => {
       script.innerHTML = JSON.stringify({
         "autosize": true,
         "symbol": symbol,
-        "interval": "15",
+        "interval": interval,
         "timezone": "Etc/UTC",
         "theme": "dark",
         "style": "1",
@@ -29,7 +29,7 @@ const TradingViewWidget = ({ symbol }: { symbol: string }) => {
       });
       container.current.appendChild(script);
     }
-  }, [symbol]);
+  }, [symbol, interval]);
 
   return <div className="h-full w-full bg-[#151921] rounded-none" ref={container} />;
 };

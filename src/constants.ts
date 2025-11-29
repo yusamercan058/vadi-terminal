@@ -68,9 +68,9 @@ export const PROP_DATA: PropFirm[] = [
 ];
 
 export const ASSET_CONFIG = {
-    'EURUSD': { tvSymbol: "FX:EURUSD", apiSymbol: "EURUSDT" },
-    'GBPUSD': { tvSymbol: "FX:GBPUSD", apiSymbol: "GBPUSDT" },
-    'XAUUSD': { tvSymbol: "OANDA:XAUUSD", apiSymbol: "PAXGUSDT" },
-    'BTCUSD': { tvSymbol: "BINANCE:BTCUSDT", apiSymbol: "BTCUSDT" },
-    'ETHUSD': { tvSymbol: "BINANCE:ETHUSDT", apiSymbol: "ETHUSDT" }
+    'EURUSD': { tvSymbol: "FX:EURUSD", apiSymbol: "EURUSDT", smtPair: 'DXY' },
+    'GBPUSD': { tvSymbol: "FX:GBPUSD", apiSymbol: "GBPUSDT", smtPair: 'DXY' },
+    'XAUUSD': { tvSymbol: "OANDA:XAUUSD", apiSymbol: "PAXGUSDT", smtPair: 'DXY' },
+    'BTCUSD': { tvSymbol: "BINANCE:BTCUSDT", apiSymbol: "BTCUSDT", smtPair: null },
+    'US100': { tvSymbol: "CAPITALCOM:US100", apiSymbol: "NAS100", smtPair: 'SPX500' }
   };

@@ -1,5 +1,5 @@
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useMemo } from 'react';
 import { createChart, ColorType, IChartApi, ISeriesApi, Time, SeriesMarker, IPriceLine } from 'lightweight-charts';
 import { Candle, SMCZone, ChartMarker, LiquidityLevel, OpenPosition } from '../types';
 
@@ -8,16 +8,30 @@ interface SmartChartProps {
     zones: SMCZone[];
     markers: ChartMarker[];
     liquidityLevels?: LiquidityLevel[];
-    positions?: OpenPosition[]; // New prop for open positions
+    positions?: OpenPosition[];
+    equilibrium?: number;
 }
 
-const SmartChart: React.FC<SmartChartProps> = ({ data, zones, markers, liquidityLevels = [], positions = [] }) => {
+const SmartChart: React.FC<SmartChartProps> = ({ data, zones, markers, liquidityLevels = [], positions = [], equilibrium }) => {
     const chartContainerRef = useRef<HTMLDivElement>(null);
     const chartRef = useRef<IChartApi | null>(null);
     const seriesRef = useRef<ISeriesApi<"Candlestick"> | null>(null);
     const histogramRef = useRef<ISeriesApi<"Histogram"> | null>(null);
     const activeLinesRef = useRef<IPriceLine[]>([]);
-    const positionLinesRef = useRef<IPriceLine[]>([]); // To track position lines
+    const positionLinesRef = useRef<IPriceLine[]>([]);
+    const equilibriumLineRef = useRef<IPriceLine | null>(null);
+
+    // Memoize sorted zones and markers BEFORE useEffect
+    const sortedZones = useMemo(() => {
+        return [...zones]
+            .filter(z => z.status === 'FRESH' || z.status === 'TESTED')
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 8); // Show top 8 zones
+    }, [zones]);
+
+    const sortedMarkers = useMemo(() => {
+        return [...markers].sort((a, b) => (a.time as number) - (b.time as number));
+    }, [markers]);
 
     useEffect(() => {
         if (!chartContainerRef.current) return;
@@ -153,14 +167,16 @@ const SmartChart: React.FC<SmartChartProps> = ({ data, zones, markers, liquidity
             }
         });
 
-    }, [positions]); // Re-run when positions change
+    }, [positions]);
 
     // Effect for Data and Zones
     useEffect(() => {
         if (!seriesRef.current || data.length === 0) return;
 
+        const seriesApi = seriesRef.current as any;
+
         // 1. Set Candle Data
-        seriesRef.current.setData(data.map(d => ({
+        seriesApi.setData(data.map(d => ({
             time: d.time as Time,
             open: d.open,
             high: d.high,
@@ -178,7 +194,6 @@ const SmartChart: React.FC<SmartChartProps> = ({ data, zones, markers, liquidity
                 const currentDay = date.getUTCDate();
                 
                 if (currentDay !== lastDay) {
-                    // New Day Detected
                     histogramData.push({ time: d.time as Time, value: 100, color: 'rgba(255, 255, 255, 0.08)' });
                     lastDay = currentDay;
                 } else {
@@ -188,37 +203,68 @@ const SmartChart: React.FC<SmartChartProps> = ({ data, zones, markers, liquidity
             histogramRef.current.setData(histogramData);
         }
 
-        // 3. Clear Previous Lines (Zones & Liquidity)
+        // 3. Clear Previous Lines (Zones & Liquidity & Equilibrium)
         activeLinesRef.current.forEach(line => {
-             if (seriesRef.current && (seriesRef.current as any).removePriceLine) {
-                 (seriesRef.current as any).removePriceLine(line);
+             if (seriesApi.removePriceLine) {
+                 seriesApi.removePriceLine(line);
              }
         });
         activeLinesRef.current = [];
-
-        // 4. Draw High Quality Zones
-        const activeZones = zones.filter(z => z.status === 'FRESH').slice(0, 5);
         
-        activeZones.forEach(z => {
-            if (!seriesRef.current) return;
-            const seriesApi = seriesRef.current as any;
+        if (equilibriumLineRef.current) {
+            if (seriesApi.removePriceLine) seriesApi.removePriceLine(equilibriumLineRef.current);
+            equilibriumLineRef.current = null;
+        }
 
+        // 4. Draw Equilibrium Line (Dealing Range 50%)
+        if (equilibrium && seriesApi.createPriceLine) {
+            const eqLine = seriesApi.createPriceLine({
+                price: equilibrium,
+                color: '#a855f7', // Purple
+                lineWidth: 1,
+                lineStyle: 2, // Dashed
+                axisLabelVisible: true,
+                title: 'EQ (50%)',
+            });
+            equilibriumLineRef.current = eqLine;
+        }
+
+        // 5. IMPROVED Zone Visualization with Age, Test Count, Success Rate
+        // Use memoized sorted zones
+        sortedZones.forEach(z => {
             if (!seriesApi.createPriceLine) return;
 
             const isBullish = z.type.includes('Bullish') || z.type === 'Unicorn Setup';
             const isUnicorn = z.type === 'Unicorn Setup';
             const isFVG = z.type.includes('FVG');
             
+            // Color based on zone quality and status
             let mainColor = isBullish ? 'rgba(34, 197, 94, 0.9)' : 'rgba(239, 68, 68, 0.9)';
             if (isUnicorn) mainColor = 'rgba(168, 85, 247, 0.9)';
             if (isFVG) mainColor = isBullish ? 'rgba(234, 179, 8, 0.9)' : 'rgba(234, 179, 8, 0.9)';
-
-            const labelText = isUnicorn ? '🦄 UNICORN' : isFVG ? '⚠️ FVG GAP' : '📦 OB';
+            
+            // Adjust opacity based on zone age (fresher = more opaque)
+            if (z.age) {
+                const ageFactor = Math.max(0.5, 1 - (z.age / 100)); // Fade out older zones
+                mainColor = mainColor.replace('0.9', ageFactor.toFixed(2));
+            }
+            
+            // Build label with additional info
+            let labelText = isUnicorn ? '🦄 UNICORN' : isFVG ? '⚠️ FVG' : '📦 OB';
+            if (z.testCount && z.testCount > 0) {
+                labelText += ` (${z.testCount}x)`;
+            }
+            if (z.age) {
+                labelText += ` [${z.age}]`;
+            }
+            if (z.successRate !== undefined) {
+                labelText += ` ${z.successRate.toFixed(0)}%`;
+            }
 
             const topLine = seriesApi.createPriceLine({
                 price: z.priceTop,
                 color: mainColor,
-                lineWidth: isUnicorn ? 2 : 1,
+                lineWidth: isUnicorn ? 2 : (z.score >= 80 ? 2 : 1),
                 lineStyle: 0, 
                 axisLabelVisible: true,
                 title: labelText,
@@ -227,7 +273,7 @@ const SmartChart: React.FC<SmartChartProps> = ({ data, zones, markers, liquidity
             const bottomLine = seriesApi.createPriceLine({
                 price: z.priceBottom,
                 color: mainColor,
-                lineWidth: isUnicorn ? 2 : 1,
+                lineWidth: isUnicorn ? 2 : (z.score >= 80 ? 2 : 1),
                 lineStyle: isFVG ? 2 : 0, 
                 axisLabelVisible: false,
                 title: '',
@@ -237,11 +283,8 @@ const SmartChart: React.FC<SmartChartProps> = ({ data, zones, markers, liquidity
             if (bottomLine) activeLinesRef.current.push(bottomLine);
         });
 
-        // 5. Draw Liquidity Levels (PDH / PDL / ASIA / MIDNIGHT)
+        // 6. Draw Liquidity Levels
         liquidityLevels.forEach(lvl => {
-             if (!seriesRef.current) return;
-             const seriesApi = seriesRef.current as any;
-             
              if (!seriesApi.createPriceLine) return;
 
              const line = seriesApi.createPriceLine({
@@ -255,8 +298,8 @@ const SmartChart: React.FC<SmartChartProps> = ({ data, zones, markers, liquidity
              if (line) activeLinesRef.current.push(line);
         });
 
-        // 6. Set Markers
-        const chartMarkers: SeriesMarker<Time>[] = markers.map(m => ({
+        // 7. Set Markers
+        const chartMarkers: SeriesMarker<Time>[] = sortedMarkers.map(m => ({
             time: m.time as Time,
             position: m.position,
             color: m.color,
@@ -265,9 +308,9 @@ const SmartChart: React.FC<SmartChartProps> = ({ data, zones, markers, liquidity
             size: m.size || 1
         }));
 
-        (seriesRef.current as any).setMarkers(chartMarkers.sort((a,b) => (a.time as number) - (b.time as number)));
+        seriesApi.setMarkers(chartMarkers);
 
-    }, [data, zones, markers, liquidityLevels]);
+    }, [data, sortedZones, sortedMarkers, liquidityLevels, equilibrium]);
 
     return (
         <div ref={chartContainerRef} className="h-full w-full relative group bg-black">
@@ -278,14 +321,12 @@ const SmartChart: React.FC<SmartChartProps> = ({ data, zones, markers, liquidity
              <div className="absolute bottom-10 left-4 z-10 flex flex-col gap-1 pointer-events-none opacity-50 text-[10px]">
                 <div className="flex items-center gap-1"><div className="w-3 h-1 bg-green-500"></div> Bullish OB</div>
                 <div className="flex items-center gap-1"><div className="w-3 h-1 bg-red-500"></div> Bearish OB</div>
-                <div className="flex items-center gap-1"><div className="w-3 h-1 bg-yellow-500"></div> FVG (Imbalance)</div>
-                <div className="flex items-center gap-1"><div className="w-3 h-1 bg-purple-500"></div> Unicorn (OB+FVG)</div>
+                <div className="flex items-center gap-1"><div className="w-3 h-1 bg-purple-500"></div> EQ (Denge)</div>
                 <div className="flex items-center gap-1"><div className="w-3 h-1 border-b border-purple-500 border-dashed"></div> ASIA Range</div>
                 <div className="flex items-center gap-1"><div className="w-3 h-1 border-b border-pink-500 border-dotted"></div> Midnight Open</div>
-                <div className="flex items-center gap-1"><div className="w-3 h-1 bg-blue-500"></div> ENTRY Line</div>
              </div>
         </div>
     );
 };
 
-export default SmartChart;
+export default React.memo(SmartChart);
